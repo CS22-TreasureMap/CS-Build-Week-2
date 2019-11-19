@@ -40,6 +40,7 @@ class mapper:
     self.save_map_to_text = save  #save latest map to a text file
     self.import_text_map = load_map #import map so far - setting to false starts from scratch
     self.player = None
+    self.important_rooms = {}
 
   def get_info(self, what='init', direction=None, backtrack=None):
     """multi purpose move & init function - this is used
@@ -82,6 +83,13 @@ class mapper:
     if what == 'confirm_sell':
       response = requests.post(f'{my_url}{what}/', headers=self.header, json={"name":treasure, "confirm" : "yes"})
 
+    # Change Name +++++++
+    if what == 'change_name':
+      response = request.post(f'{my_url}{what}/', headers=self.headers, json={"name":new})
+    # Confirm Name +++++++
+    if what == 'confirm_name':
+      response = request.post(f'{my_url}{what}/', headers=self.headers, json={"confirm": "aye"})
+
     if response.status_code==200:
       self.info = json.loads(response.content)
       if 'cooldown' in self.info.keys():
@@ -96,11 +104,21 @@ class mapper:
     if self.info['items']!=[] and self.accumulate:
       for item in self.info['items']:
 
-        self.info = self.action('take',item)
+        self.info = self.action('take', item)
         print(self.info)
 
     if self.info['title'] == "Linh's Shrine" and self.pray:  #there may be other shrines
       self.info = self.action('pray')
+
+    # Would this sell? ++++++
+    if self.info['title'] == "shop":
+      self.info = self.action('sell', item)
+      self.info = self.action('confirm_sell')
+
+    # Could this do the name change? +++++++
+    if self.info['title'] == "pirate ry": 
+      self.info = self.action('change_name', name)
+      self.info = self.action('confirm_name')
     
   def create_starting_map(self):
     """"initiates your starting map which is stored under the vertices of a graph class"""
@@ -118,6 +136,10 @@ class mapper:
             string_dict = json.loads(file.read())
             for key in string_dict:
                 self.my_map.vertices[int(key)] = string_dict[key]
+        with open('rooms.txt', 'r') as file:
+            string_dict = json.loads(file.read())
+            for key in string_dict:
+                self.important_rooms[key] = string_dict[key]
     else:
         print("fresh map triggered")
         self.my_map.vertices[self.player.currentRoom] = exit_dict
@@ -144,6 +166,11 @@ class mapper:
     if self.save_map_to_text:
         with open('map.txt','w') as file:
             file.write(json.dumps(self.my_map.vertices))
+        
+    self.important_rooms.update({info['title']: info['room_id']})
+    if self.save_map_to_text:
+      with open('rooms.txt', 'w') as file:
+        file.write(json.dumps(self.important_rooms))
 
   def count_unmapped(self):
     """counts all the unmapped rooms"""
@@ -215,8 +242,7 @@ class mapper:
       c+=1
 
   def go_to_room(self, destination):
-    """depth first traversal to particular room in shortest route
-    NOT OPERATIONAL YET"""
+    """depth first traversal to particular room in shortest route"""
     self.accumulate = False
     print('moving')
     path = self.my_map.bfs(self.player.currentRoom, destination)
@@ -235,23 +261,65 @@ class mapper:
           continue
     self.accumulate = True
 
-      # s = Stack()
-      # s.push([self.player.currentRoom])
-      
-      # while destination not in s.stack[-1]:
-      #   current_point = s.stack[-1][-1]
-        
-      #   joins = self.my_map.vertices[current_point]
-      #   if joins is None:
-      #     s.pop()
-      #   else:
-      #     temp_list = []
-      #     for j in joins:
-      #       _ = [x for x in s.stack[-1]]
-      #       _.append(j)
-      #       temp_list.append(_)
-      #     for tl in temp_list:
-      #       s.push(tl)
+  def pirate(self):
+    # Goes directly to pirate ry
+    # self.go_to_room(self.important_rooms['pirate ry'])
+    # time.sleep(self.wait)
+    pass
 
-      # return s.stack[-1]
+  def wishing_well(self):
+    # Goes directly to pirate ry
+    # self.go_to_room(self.important_rooms['wishing well'])
+    # time.sleep(self.wait)
+    pass
 
+  def vendor(self):
+    # Goes directly to the shop
+    self.go_to_room(1)
+    time.sleep(self.wait)
+
+  # Method to get treasure
+  # BFS Randomly to travel the maze, looting
+  # Once you get enough treasure, go sell
+  # Once you reach 1000 gold, buy a name
+    # Change name to something unique, that doesnt contain player
+  # Keep looting and selling until stopped.
+  def get_treasure(self):
+    while True:
+      if self.player.name.contains('player') and self.player.gold > 1000: # get a name
+        # Go to name changer (pirate ry)
+        print('Time to Buy a Name')
+        self.go_to_room(self.important_rooms['pirate ry'])
+        time.sleep(self.wait)
+        # Buy name
+        self.action('change_name')
+        time.sleep(self.wait)
+        # confirm_name
+        self.action('confirm_name')
+        print('Got a name! Time to get a COIN.', {self.player.name})
+        time.sleep(self.wait)
+        # self.action('status') #Check new name
+      elif player.encumbered <= player.strength - 2:
+        # If encumbered is str-2 (at base = 8)
+        # Travel the room bfs style at random
+        # Loot as you go with room_check
+        print('Looting..')
+        # self.explore_random(500)
+        self.go_to_room(str(random.choice(range(0,499))))
+        time.sleep(self.wait)
+      # Could potentially add a section to manage miner
+      else:
+        # else go directly to the shop
+        # loop through inventory and sell
+        # Go back to looting
+        print('Need to offload my loot.')
+        self.vendor()
+        print('At the shop, time to sell.')
+        for count in range(self.player.inventory):
+          print('Selling item..')
+          self.action('sell', item)
+          time.sleep(self.wait)
+          self.action('confirm_sell')
+          print({self.player.gold})
+          time.sleep(self.wait)
+        print('Back to Looting', {self.player.inventory})
