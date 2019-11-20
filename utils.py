@@ -246,18 +246,13 @@ class mapper:
     self.accumulate = False
     print('moving')
     path = self.my_map.bfs(self.player.currentRoom, destination)
-    # print(f'Path: {path}')
     for m in path:
       room = self.player.currentRoom
-      # print(f'Room: {type(room)}')
       exits = self.my_map.vertices[room]
-      # print(f'Room: {room}')
       for direction in exits:
         if self.my_map.vertices[room][direction] == m:
-          # print(f'direction: {direction}')
           self.get_info(what='move', direction=direction)
         else:
-          # print(f'go_to_room FAILED: Invalid Direction[{direction}], Room[{room}]')
           continue
     self.accumulate = True
 
