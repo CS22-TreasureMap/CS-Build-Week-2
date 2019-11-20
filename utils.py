@@ -383,7 +383,6 @@ class mapper:
                 time.sleep(self.wait)
             else:
                 print('Need to offload my loot.')
-                # * Setting accumulate to false so we don't get overburdening on the way to shop.
                 self.accumulate = False
                 self.vendor()
                 print('At the shop, time to sell.')
