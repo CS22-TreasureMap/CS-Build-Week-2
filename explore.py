@@ -1,7 +1,7 @@
 from utils import *
 
 mappy = mapper()
-mappy.accumulate=True   #set pick up items to false
+mappy.accumulate=True
 mappy.import_text_map=True
 mappy.create_starting_map()
 
@@ -11,7 +11,7 @@ mappy.create_starting_map()
 
 
 # Infinite $$
-# mappy.get_treasure()
+mappy.get_treasure()
 
 # All the coins
-mappy.auto_coins()
+# mappy.auto_coins()

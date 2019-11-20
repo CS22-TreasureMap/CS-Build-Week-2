@@ -11,7 +11,10 @@ from cpu2 import *
 auth_key = config('AUTH_KEY')  # MAKE SURE YPU HAVE .ENV SET UP
 my_url = config('LAMBDA_URL')  # AND PYTHON DECOUPLE INSTALLED
 my_name = config('NAME')  # when to change name
-
+url = 'https://lambda-treasure-hunt.herokuapp.com/api/adv/status/'
+headers = {'Authorization': f'Token {auth_key}'}
+r = requests.post(url, headers=headers)
+ret_data = r.json()
 
 def keystoint(x):
     "function to change json dictionary keys to ints - used for map load"
@@ -22,17 +25,18 @@ class Player:
     def __init__(self, name, startingRoom):
         self.name = name
         self.currentRoom = startingRoom
-        self.player_cooldown = 1,
-        self.player_encumbrance = 0,
-        self.player_strength = 0,
-        self.player_speed = 0,
-        self.player_gold = 0,
-        self.player_inventory = [],
-        self.player_status = [],
-        self.player_errors = [],
-        self.player_messages = []
-        self.player_mine = ''
-
+        self.player_cooldown = ret_data['cooldown']
+        self.player_encumbrance = ret_data['encumbrance']
+        self.player_strength = ret_data['strength']
+        self.player_speed = ret_data['speed']
+        self.player_gold = ret_data['gold']
+        self.player_inventory = ret_data['inventory']
+        self.player_bodywear = ret_data['bodywear']
+        self.player_footwear = ret_data['footwear']
+        self.player_status = ret_data['status']
+        self.player_errors = ret_data['errors']
+        self.player_messages = ret_data['messages']
+        self.player_abilities = ret_data['abilities']
 
 class mapper:
     def __init__(self, auth=auth_key, save=True, load_map=True):
@@ -113,6 +117,16 @@ class mapper:
         if what == 'balance':
             response = requests.get(
                 'https://lambda-treasure-hunt.herokuapp.com/api/bc/get_balance/', headers=self.header)
+
+        if what == 'wear':
+            response = requests.post(
+                'https://lambda-treasure-hunt.herokuapp.com/api/adv/wear/', headers = self.header, json={"name": treasure})
+        if what == 'undress':
+            response = requests.post(
+                'https://lambda-treasure-hunt.herokuapp.com/api/adv/undress/', headers = self.header, json={"name": treasure})
+        if what == 'transmogrify':
+            response = requests.post(
+                'https://lambda-treasure-hunt.herokuapp.com/api/adv/transmogrify/', headers = self.header, json={"name": treasure})
 
         if response.status_code == 200:
             self.info = json.loads(response.content)
@@ -301,8 +315,7 @@ class mapper:
                         #print('walk triggered',path[i+1],direction)
                         self.get_info(what='backtrack', direction=direction,backtrack=str(path[i+1]))
                         print(
-                            f"Current Room -> Title: {self.info['title']} ID: {self.info['room_id']} Items: {self.info['items']}")
-                           
+                            f"Current Room -> Title: {self.info['title']} ID: {self.info['room_id']} Items: {self.info['items']}")   
                     else:
                         continue
                 i+=1
@@ -345,17 +358,17 @@ class mapper:
 
     def pirate(self):
         # Goes directly to pirate ry
-        self.go_to_room(467)
+        self.dash_to_room(467)
         time.sleep(self.wait)
 
     def wishing_well(self):
         # Goes directly to pirate ry
-        self.go_to_room(55)
+        self.dash_to_room(55)
         time.sleep(self.wait)
 
     def vendor(self):
         # Goes directly to the shop
-        self.go_to_room(1)
+        self.dash_to_room(1)
         time.sleep(self.wait)
 
     def get_treasure(self):
@@ -366,7 +379,7 @@ class mapper:
             print(self.info)
             print("*******************************************************")
             #!------------------------This name is specific to each person, be sure to change this to yours.
-            if self.info['name'] == 'player420' and self.info['gold'] >= 1000:
+            if self.player.name == 'player420' and self.player.player_gold >= 1000:
                 print('Time to Buy a Name')
                 self.accumulate = False
                 self.pirate()
@@ -374,27 +387,25 @@ class mapper:
                 #! -------------------------- Change the name here to be what you want!!
                 self.action('change_name', name='SirSnuffaluffagus')
                 time.sleep(self.wait)
-                print(f"Got a name! Time to get a COIN. New Name: {self.info['name']}")
-                time.sleep(self.wait)
-            elif self.info['encumbrance'] <= self.info['strength'] - 2:
+                print(f"Got a name! Time to get a COIN.")
+            elif self.player.player_encumbrance <= self.player.player_strength - 2:
                 print('Looting..')
                 self.accumulate = True
                 self.go_to_room(random.randint(0, 499))
+                # self.dash_to_room(random/randint(0,499))
                 time.sleep(self.wait)
             else:
                 print('Need to offload my loot.')
                 self.accumulate = False
                 self.vendor()
                 print('At the shop, time to sell.')
-                for item in self.info['inventory']:
-                    print(f"Selling {item}...")
+                for item in self.player.player_inventory:
                     self.action('sell', item)
                     time.sleep(self.wait)
                     self.action('confirm_sell', item)
                     time.sleep(self.wait)
-                    # This doesn't actually update after each sell for some reason.
-                print(f"You're current gold: ", self.info['gold'])
-                print('Back to Looting')
+                print(self.player.player_gold) 
+                print('Done selling. Back to Looting.')
 
     def hint_to_ld8(self):
         "converts hint in well to room number"
@@ -454,3 +465,30 @@ class mapper:
             print(mine_room)
             self.dash_to_room(mine_room)
             self.get_proof()
+
+    def transmogrify(self):
+        r = self.action('status')
+        ret_data = r
+        print(ret_data)
+        for item in ret_data['inventory']:
+          res = self.action('transmogrify', item) 
+          print(res)
+
+    def equip_gear(self):
+      r = self.action('status')
+      ret_data = r
+      examine_info = self.action('examine', ret_data['bodywear'])
+      print(f'Examine: {examine_info}')
+      for item in ret_data['inventory']:
+        res = self.action('wear', item)
+        print(f"Equpided {item}!")
+
+    def unequip_gear(self, body_or_feet):
+      if body_or_feet == 'feet':
+        item = self.player.player_footwear
+        res = self.action('undress', item)
+        print(f'You unequipped {item}')
+      elif body_or_feet == 'body':
+        item = self.player.player_bodywear
+        res = self.action('undress', item)
+        print(f'You unequipped {item}')
