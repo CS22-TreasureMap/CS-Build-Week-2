@@ -49,7 +49,7 @@ class mapper:
         self.player = None
         self.fly = False
         self.dash = False
-        self.important_rooms = {} # May not need this anymore (all special rooms are id'd)
+        self.important_rooms = {}
 
     def get_info(self, what='init', direction=None, backtrack=None):
         """multi purpose move & init function - this is used
@@ -122,7 +122,7 @@ class mapper:
             print('error', what, treasure, response.status_code)
 
     def room_check(self):
-        """checks for items in teh room or special rooms"""
+        """checks for items in the room or special rooms"""
         # print('room check triggered.  info: ',self.info)
         if self.info['items'] != [] and self.accumulate:
             for item in self.info['items']:
@@ -144,7 +144,7 @@ class mapper:
         info_dict = self.get_info()
         # print(info_dict)  # this can be deactivated - just helpful at first
         self.my_map = Graph()
-        self.player = Player("MicahJones", info_dict['room_id'])
+        self.player = Player("SirSnuffaluffagus", info_dict['room_id'])
         exits = info_dict['exits']
         exit_dict = {}
         for e in exits:
@@ -155,7 +155,6 @@ class mapper:
                 string_dict = json.loads(file.read())
                 for key in string_dict:
                     self.my_map.vertices[int(key)] = string_dict[key]
-            # May not need this anymore since all important rooms are id'd
             with open('rooms.txt', 'r') as file:
                 string_dict = json.loads(file.read())
                 for key in string_dict:
@@ -185,8 +184,7 @@ class mapper:
         self.my_map.vertices[new_room][reverse_move] = old_room
         if self.save_map_to_text:
             with open('map.txt', 'w') as file:
-                file.write(json.dumps(self.my_map.vertices))
-        # May not need this anymore since all important rooms are id'd        
+                file.write(json.dumps(self.my_map.vertices))   
         self.important_rooms.update({info['title']: info['room_id']})
         if self.save_map_to_text:
             with open('rooms.txt', 'w') as file:
@@ -309,7 +307,6 @@ class mapper:
 
     def get_dash_path(self,traversal,dirs):
         "check if the path in go to room contains a dashable stretch"
-        #print('dash path check',traversal,dirs)
         dash_list = []
         j = 0
         while (j<len(dirs)-1) and dirs[j]==dirs[j+1]:
@@ -317,7 +314,6 @@ class mapper:
             j += 1
         dash_list.append(traversal[j])
         dash_list.append(traversal[j+1])
-        #print('dash_list',dash_list)
         return dash_list
 
     def make_dash(self,direction,traversal):
@@ -325,7 +321,6 @@ class mapper:
         string_rooms = ','.join([str(x) for x in traversal])
         params = {"direction":direction, "num_rooms":str(len(traversal)), 
                             "next_room_ids": string_rooms}
-        #print('dash_list_json',params,f'{my_url}dash/')
         response = requests.post(
                     f'{my_url}dash/', headers=self.header, json=params)
 
@@ -359,105 +354,55 @@ class mapper:
         self.go_to_room(1)
         time.sleep(self.wait)
 
-    # Method to get treasure
-    # BFS Randomly to travel the maze, looting
-    # Once you get enough treasure, go sell
-    # Once you reach 1000 gold, buy a name
-    # Change name to something unique, that doesnt contain player
-    # Keep looting and selling until stopped.
     def get_treasure(self):
         while True:
-            #! This request is being used to get information about our player from the lambda server.
-            #! This would probably be better off initializing our local player attributes at the top, but
-            #! I tried this first.
-            url = 'https://lambda-treasure-hunt.herokuapp.com/api/adv/status/'
-            token = config('AUTH_KEY')
-            headers = {'Authorization': f'Token {token}'}
-            r = requests.post(url, headers=headers)
-            ret_data = r.json()
+            self.action('status')
             print('\n')
             print(f"***********Current Character Attributes***************")
-            print(ret_data)
+            print(self.info)
             print("*******************************************************")
-
             #!------------------------This name is specific to each person, be sure to change this to yours.
-            if ret_data['name'] == 'player420' and ret_data['gold'] >= 1000:
-                # Go to name changer (pirate ry)
+            if self.info['name'] == 'player420' and self.info['gold'] >= 1000:
                 print('Time to Buy a Name')
-                # * Made this false here so that we don't somehow pick up a ton of treasure on the way, and
-                # * get over-encumbered.
                 self.accumulate = False
-                self.pirate()  # pirate ry's room
+                self.pirate()
                 time.sleep(self.wait)
-                # Buy name
                 #! -------------------------- Change the name here to be what you want!!
                 self.action('change_name', name='SirSnuffaluffagus')
                 time.sleep(self.wait)
-
-                #! This print isn't accurate. It doesn't update when you actually change your name.
-                #! Next time you see it, it should have changed though.
-                print(f"Got a name! Time to get a COIN. New Name: {ret_data['name']}")
+                print(f"Got a name! Time to get a COIN. New Name: {self.info['name']}")
                 time.sleep(self.wait)
-                # self.action('status') #Check new name
-            elif ret_data['encumbrance'] <= ret_data['strength'] - 2:
-                # If encumbered is str-2 (at base = 8)
-                # Travel the room bfs style at random
-                # Loot as you go with room_check
+            elif self.info['encumbrance'] <= self.info['strength'] - 2:
                 print('Looting..')
-                # * accumlate is true here since that's the whole point of this block
                 self.accumulate = True
-
-                # self.explore_random(500)
                 self.go_to_room(random.randint(0, 499))
-                print('Current Inventory: ', ret_data['inventory'])
                 time.sleep(self.wait)
-            # Could potentially add a section to manage miner
             else:
-                # else go directly to the shop
-                # loop through inventory and sell
-                # Go back to looting
                 print('Need to offload my loot.')
                 # * Setting accumulate to false so we don't get overburdening on the way to shop.
                 self.accumulate = False
                 self.vendor()
                 print('At the shop, time to sell.')
-                for item in ret_data['inventory']:
+                for item in self.info['inventory']:
                     print(f"Selling {item}...")
                     self.action('sell', item)
                     time.sleep(self.wait)
                     self.action('confirm_sell', item)
                     time.sleep(self.wait)
                     # This doesn't actually update after each sell for some reason.
-                    print(f"You're current gold: {ret_data['gold']}")
+                print(f"You're current gold: ", self.info['gold'])
                 print('Back to Looting')
 
     def get_coins(self):
-      # Want this to do 3 things:
-      # Function to go to the wishing well and examine
-      # Function to go to where the wishing well says
-      # Function to mine coin at specified location
-      # Could include if clause to go transmog coins
-
       coins = 0
-      # variable for proof?
       while coins < 1000:
-        # Go to wishing well
         print('Going to the Wishing Well.')
         self.wishing_well()
-        # Examine well
-        self.action('examine')
-        # Go to where it says
-        self.go_to_room('hinted location/room')
-        # Mine Coin
+        self.hint_to_ld8
+        self.go_to_room('hinted room')
         print('Getting proof...')
-        response = request.post(f'https://lambda-treasure-hunt.herokuapp.com/api/bc/last_proof/', headers=self.headers)
-        new_proof = proof_of_work(data.get('proof'), data.get('difficulty'))
-        time.sleep(self.wait)
-        # Need to send new_proof in the mine request json
-        response = request.post(f'https://lambda-treasure-hunt.herokuapp.com/api/bc/mine/', headers=self.headers, json={"proof":''})
-        print('You got a coin!')
+        self.get_proof()
         coins += 1
-        time.sleep(self.wait)
 
     def hint_to_ld8(self):
         "converts hint in well to room number"
@@ -510,6 +455,7 @@ class mapper:
         self.action('status')
         inv = self.info['inventory']
         for i in inv:
+            print(f"Selling {i}...")
             self.action('sell',i)
             self.action('confirm_sell',i)
 
