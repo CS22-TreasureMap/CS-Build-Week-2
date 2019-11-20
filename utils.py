@@ -6,6 +6,7 @@ import json
 import time
 import random
 import os
+import ls8
 
 auth_key = config('AUTH_KEY')  # MAKE SURE YPU HAVE .ENV SET UP
 my_url = config('LAMBDA_URL')  # AND PYTHON DECOUPLE INSTALLED
@@ -100,6 +101,8 @@ class mapper:
 
         if what in ['status', 'pray']:
             response = requests.post(f'{my_url}{what}/', headers=self.header)
+            print(f"Action: {what}")
+            print(self.info)
 
         if what == 'confirm_sell':
             response = requests.post(
@@ -275,81 +278,83 @@ class mapper:
                 if self.my_map.vertices[room][direction] == m:
                     self.get_info(what='move', direction=direction)
                     print(
-                        f"Current Room -> Title: {self.info['title']} ID: {self.info['room_id']} Items: {self.info['items']}")
+                        f"Current Room -> Title: {self.info['title']} ID: {self.info['room_id']} Items: {self.info['items']} Description: {self.info['description']}")
                 else:
                     continue
 
     def dash_to_room(self, destination):
-        "same as go to room but with dash"
-        print('dashing')
-        path = self.my_map.bfs(self.player.currentRoom, destination)
-        my_dirs = self.get_dirs(path)
-        i = 0
-        while i < len(path):
-            if my_dirs[i]==my_dirs[i+1]:
-                dash_path = self.get_dash_path(path[i:],my_dirs[i:])
-                self.make_dash(my_dirs[i],dash_path[1:])
-                print(f"Current Room -> Title: {self.info['title']} ID: {self.info['room_id']} Items: {self.info['items']}")
-                i += len(dash_path[1:])
-            else:
-                room = self.player.currentRoom
-                exits = self.my_map.vertices[room]
-                for direction in exits:
-                    if self.my_map.vertices[room][direction] == path[i]:
-                        self.get_info(what='move', direction=direction)
-                        print(
-                            f"Current Room -> Title: {self.info['title']} ID: {self.info['room_id']} Items: {self.info['items']}")
+      "same as go to room but with dash"
+      #print('dashing')
+      path = self.my_map.bfs(self.player.currentRoom, destination)
+      #print('bfs',path)
+      my_dirs = self.get_dirs(path)
+      i = 0
+      while i < len(path)-1:
+        if i < len(path)-2 and my_dirs[i]==my_dirs[i+1]:
+          print('dashing')
+          dash_path = self.get_dash_path(path[i:],my_dirs[i:])
+          self.make_dash(my_dirs[i],dash_path[1:])
+          print(f"Current Room -> Title: {self.info['title']} ID: {self.info['room_id']} Items: {self.info['items']}")
+          i += len(dash_path[1:])
+        else:
+          print('normal walking')
+          room = self.player.currentRoom
+          exits = self.my_map.vertices[room]
+          for direction in exits:
+            if self.my_map.vertices[room][direction] == path[i+1]:
+              #print('walk triggered',path[i+1],direction)
+              self.get_info(what='backtrack', direction=direction,backtrack=str(path[i+1]))
+              print(f"Current Room -> Title: {self.info['title']} ID: {self.info['room_id']} Items: {self.info['items']}")
                            
-                    else:
-                        pass
-                i+=1
+            else:
+              continue
+          i+=1
 
 
     def get_dash_path(self,traversal,dirs):
-        "check if the path in go to room contains a dashable stretch"
-        print('dash path check',traversal,dirs)
-        dash_list = []
-        j = 0
-        while dirs[j]==dirs[j+1]:
-            dash_list.append(traversal[j])
-            j += 1
+
+      "check if the path in go to room contains a dashable stretch"
+      print('dash path check',traversal,dirs)
+      dash_list = []
+      j = 0
+      while (j<len(dirs)-1) and dirs[j]==dirs[j+1]:
         dash_list.append(traversal[j])
-        dash_list.append(traversal[j+1])
-        print('dash_list',dash_list)
-        return dash_list
+        j += 1
+      dash_list.append(traversal[j])
+      dash_list.append(traversal[j+1])
+      #print('dash_list',dash_list)
+      return dash_list
 
     def make_dash(self,direction,traversal):
-        "make a dash given direction and traversal"
-        string_rooms = ','.join([str(x) for x in traversal])
-        params = {"direction":direction, "num_rooms":str(len(traversal)), 
-                            "next_room_ids": string_rooms}
-        print('dash_list_json',params,f'{my_url}dash/')
-        response = requests.post(
-                    f'{my_url}dash/', headers=self.header, json=params)
+      "make a dash given direction and traversal"
+      string_rooms = ','.join([str(x) for x in traversal])
+      params = {"direction":direction, "num_rooms":str(len(traversal)), "next_room_ids": string_rooms}
+      print('dash_list_json',params,f'{my_url}dash/')
+      response = requests.post(f'{my_url}dash/', headers=self.header, json=params)
 
-        if response.status_code == 200:
-            self.info = json.loads(response.content)
-            if self.player is not None:
-                self.player.currentRoom = self.info['room_id']
+      if response.status_code == 200:
+        self.info = json.loads(response.content)
+        if self.player is not None:
+          self.player.currentRoom = self.info['room_id']
 
-            if 'cooldown' in self.info.keys():  
-                time.sleep(self.info['cooldown'])
+        if 'cooldown' in self.info.keys():  
+          time.sleep(self.info['cooldown'])
 
-            self.room_check()
-            return self.info
-        else:
-            print('cooldown triggered - waiting 20 seconds. code =',response.status_code,response.content)
-            time.sleep(20)
-            self.get_info(what=what, direction=direction, backtrack=backtrack)
+        self.room_check()
+        return self.info
+      else:
+        print('cooldown triggered - waiting 20 seconds. code =',response.status_code,response.content)
+        time.sleep(20)
+        self.get_info(what=what, direction=direction, backtrack=backtrack)
 
     def pirate(self):
         # Goes directly to pirate ry
-        self.go_to_room(467)
+        self.dash_to_room(467)
         time.sleep(self.wait)
 
     def wishing_well(self):
         # Goes directly to pirate ry
-        self.go_to_room(55)
+        self.dash_to_room(55)
         time.sleep(self.wait)
 
     def vendor(self):
@@ -389,7 +394,7 @@ class mapper:
                 time.sleep(self.wait)
                 # Buy name
                 #! -------------------------- Change the name here to be what you want!!
-                self.action('change_name', name='SirSnuffaluffagus')
+                self.action('change_name', name = my_name)
                 time.sleep(self.wait)
 
                 #! This print isn't accurate. It doesn't update when you actually change your name.
@@ -437,22 +442,29 @@ class mapper:
       # Could include if clause to go transmog coins
 
       coins = 0
+      
       # variable for proof?
       while coins < 1000:
         # Go to wishing well
         print('Going to the Wishing Well.')
         self.wishing_well()
-        # Examine well
-        self.action('examine')
-        # Go to where it says
-        self.go_to_room('hinted location/room')
+       
+        # #write the hint to the ld8 file
+        self.hint_to_ld8()
+        # #compute the hint
+        # #! chr not in range????
+        ls8.run_ls8()
+        coin_room = input('Enter the decoded room number here: ')
+        
+        self.dash_to_room(int(coin_room))
         # Mine Coin
         print('Getting proof...')
-        response = request.post(f'https://lambda-treasure-hunt.herokuapp.com/api/bc/last_proof/', headers=self.headers)
-        new_proof = proof_of_work(data.get('proof'), data.get('difficulty'))
+        # response = requests.post(f'https://lambda-treasure-hunt.herokuapp.com/api/bc/last_proof/', headers=self.headers)
+        # new_proof = proof_of_work(data.get('proof'), data.get('difficulty'))
+        self.get_proof()
         time.sleep(self.wait)
         # Need to send new_proof in the mine request json
-        response = request.post(f'https://lambda-treasure-hunt.herokuapp.com/api/bc/mine/', headers=self.headers, json={"proof":''})
+        #response = requests.post(f'https://lambda-treasure-hunt.herokuapp.com/api/bc/mine/', headers=self.headers, json={"proof":''})
         print('You got a coin!')
         coins += 1
         time.sleep(self.wait)
@@ -461,28 +473,33 @@ class mapper:
         "converts hint in well to room number"
         self.action('examine','well')
         z = self.info['description']  #read the last info to get the hint
-        z = assemb.split('\n')[2:]
+        print(z, 'hint')
+        hint = z.split('\n')[2:]
+        with open('hinter.ls8', 'w') as f:
+          for i in hint:
+            f.write("%s\n" % i)
+        # z = assemb.split('\n')[2:]
         # with open('hinter.ls8','w') as f:
         #     for ass in assemb:
         #         f.write("%s\n" % ass)
         #quicker way to parse message
-        z = [int(zz,2) for zz in z]
-        chars = [chr(zz) for zz in z]
-        print(chars)
-        char_index = list(range(2,131,5))
-        message = []
-        for c in char_index:
-            message.append(chars[c])
-        mine_room = message[-3:]
-        try:
-            self.mine_room = int(''.join(mine_room))
-        except:
-            try:
-                self.mine_room = int(''.join(mine_room[-2:]))
-            except:
-                self.mine_room = int(''.join(mine_room[-1:]))
-                
-        return self.mine_room
+        # z = [int(zz,2) for zz in z]
+        # chars = [chr(zz) for zz in z]
+        # print(chars)
+        # char_index = list(range(2,131,5))
+        # message = []
+        # for c in char_index:
+        #     message.append(chars[c])
+        # mine_room = message[-3:]
+        # try:
+        #     self.mine_room = int(''.join(mine_room))
+        # except:
+        #     try:
+        #         self.mine_room = int(''.join(mine_room[-2:]))
+        #     except:
+        #         self.mine_room = int(''.join(mine_room[-1:]))
+        # print(self.mine_room, 'MINEROOM')
+        # return self.mine_room
 
     def get_proof(self):
         """gets last proof then obtains proof of work

@@ -3,9 +3,18 @@
 """Main."""
 
 import sys
-from cpu import *
+from cpu2 import *
 
-cpu = CPU()
+def run_ls8():
 
-cpu.load('hinter.ls8')
-cpu.run()
+    cpu = CPU()
+
+    cpu.load('hinter.ls8')
+    cpu.run()
+
+# cpu = CPU()
+
+# cpu.load('hinter2.ls8')
+# cpu.run()
+
+# run_ls8()
