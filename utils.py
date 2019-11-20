@@ -6,6 +6,7 @@ import json
 import time
 import random
 import os
+from cpu2 import *
 
 auth_key = config('AUTH_KEY')  # MAKE SURE YPU HAVE .ENV SET UP
 my_url = config('LAMBDA_URL')  # AND PYTHON DECOUPLE INSTALLED
@@ -306,7 +307,6 @@ class mapper:
                         continue
                 i+=1
 
-
     def get_dash_path(self,traversal,dirs):
         "check if the path in go to room contains a dashable stretch"
         print('dash path check',traversal,dirs)
@@ -396,17 +396,6 @@ class mapper:
                 print(f"You're current gold: ", self.info['gold'])
                 print('Back to Looting')
 
-    def get_coins(self):
-      coins = 0
-      while coins < 1000:
-        print('Going to the Wishing Well.')
-        self.wishing_well()
-        self.hint_to_ld8
-        self.go_to_room('hinted room')
-        print('Getting proof...')
-        self.get_proof()
-        coins += 1
-
     def hint_to_ld8(self):
         "converts hint in well to room number"
         self.action('examine','well')
@@ -419,7 +408,6 @@ class mapper:
         #quicker way to parse message
         #z = [int(zz,2) for zz in z]
  
-
     def get_proof(self):
         """gets last proof then obtains proof of work
         then posts new proof to server"""
@@ -447,6 +435,22 @@ class mapper:
             self.action('sell',i)
             self.action('confirm_sell',i)
 
-    
-
-
+    def auto_coins(self):
+        while True:
+            self.dash_to_room(55)
+            self.hint_to_ld8()
+            cpu = CPU()
+            cpu.load('hinter.ls8')
+            room_inst = cpu.run()
+            room_inst = ''.join(room_inst)
+            print(room_inst)
+            try:
+                mine_room = int(room_inst[-3:])
+            except:
+                try:
+                    mine_room = int(room_inst[-2:])
+                except:
+                    mine_room = int(room_inst[-1:])
+            print(mine_room)
+            self.dash_to_room(mine_room)
+            self.get_proof()
