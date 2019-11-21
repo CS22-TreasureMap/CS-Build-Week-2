@@ -12,26 +12,34 @@ auth_key = config('AUTH_KEY')  # MAKE SURE YPU HAVE .ENV SET UP
 my_url = config('LAMBDA_URL')  # AND PYTHON DECOUPLE INSTALLED
 my_name = config('NAME')  # when to change name
 
+url = 'https://lambda-treasure-hunt.herokuapp.com/api/adv/status/'
+token = config('AUTH_KEY')
+headers = {'Authorization': f'Token {token}'}
+r = requests.post(url, headers=headers)
+ret_data = r.json()
 
 def keystoint(x):
     "function to change json dictionary keys to ints - used for map load"
     return {int(k): v for k, v in x.items()}
 
 
+
 class Player:
     def __init__(self, name, startingRoom):
         self.name = name
         self.currentRoom = startingRoom
-        self.player_cooldown = 1,
-        self.player_encumbrance = 0,
-        self.player_strength = 0,
-        self.player_speed = 0,
-        self.player_gold = 0,
-        self.player_inventory = [],
-        self.player_status = [],
-        self.player_errors = [],
-        self.player_messages = []
-        self.player_mine = ''
+        self.player_cooldown = ret_data['cooldown']
+        self.player_encumbrance = ret_data['encumbrance']
+        self.player_strength = ret_data['strength']
+        self.player_speed = ret_data['speed']
+        self.player_gold = ret_data['gold']
+        self.player_inventory = ret_data['inventory']
+        self.player_bodywear = ret_data['bodywear']
+        self.player_footwear = ret_data['footwear']
+        self.player_status = ret_data['status']
+        self.player_errors = ret_data['errors']
+        self.player_messages = ret_data['messages']
+        self.player_abilities = ret_data['abilities']
 
 
 class mapper:
@@ -113,6 +121,18 @@ class mapper:
         if what == 'balance':
             response = requests.get(
                 'https://lambda-treasure-hunt.herokuapp.com/api/bc/get_balance/', headers=self.header)
+        
+        if what == 'wear':
+            response = requests.post(
+                'https://lambda-treasure-hunt.herokuapp.com/api/adv/wear/', headers = self.header, json={"name": treasure})
+
+        if what == 'undress':
+            response = requests.post(
+                'https://lambda-treasure-hunt.herokuapp.com/api/adv/undress/', headers = self.header, json={"name": treasure})
+        
+        if what == 'transmogrify':
+            response = requests.post(
+                'https://lambda-treasure-hunt.herokuapp.com/api/adv/transmogrify/', headers = self.header, json={"name": treasure})
 
         if response.status_code == 200:
             self.info = json.loads(response.content)
@@ -362,6 +382,9 @@ class mapper:
         self.go_to_room(1)
         time.sleep(self.wait)
 
+    def transmogriphier(self):
+        self.dash_to_room(495)
+
     # Method to get treasure
     # BFS Randomly to travel the maze, looting
     # Once you get enough treasure, go sell
@@ -413,7 +436,6 @@ class mapper:
                 # self.explore_random(500)
                 self.go_to_room(random.randint(0, 499))
                 print('Current Inventory: ', ret_data['inventory'])
-                time.sleep(self.wait)
             # Could potentially add a section to manage miner
             else:
                 # else go directly to the shop
@@ -500,8 +522,6 @@ class mapper:
         for i in inv:
             self.action('sell',i)
             self.action('confirm_sell',i)
-<<<<<<< HEAD
-=======
 
     def auto_coins(self):
         while True:
@@ -523,7 +543,32 @@ class mapper:
             self.dash_to_room(mine_room)
             self.get_proof()
 
+    def transmogrify(self):
+        r = self.action('status')
+        ret_data = r
+        print(ret_data)
+        for item in ret_data['inventory']:
+          res = self.action('transmogrify', item) 
+          print(res)
     
+    def equip_gear(self):
+      r = self.action('status')
+      ret_data = r
+      # examine_info = self.action('examine', ret_data['bodywear'])
+      # print(f'Examine: {examine_info}')
+      for item in ret_data['inventory']:
+        res = self.action('wear', item)
+        print(f"Equpided {item}!")
+        
 
+    def unequip_gear(self, body_or_feet):
+      if body_or_feet == 'feet':
+        item = self.player.player_footwear
+        res = self.action('undress', item)
+        print(f'You unequipped {item}')
+      elif body_or_feet == 'body':
+        item = self.player.player_bodywear
+        res = self.action('undress', item)
+        print(f'You unequipped {item}')
+        
 
->>>>>>> aed870201bec7f647b4bc74e557024d7e6e9acb4
