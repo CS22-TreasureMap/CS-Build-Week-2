@@ -12,6 +12,11 @@ auth_key = config('AUTH_KEY')  # MAKE SURE YPU HAVE .ENV SET UP
 my_url = config('LAMBDA_URL')  # AND PYTHON DECOUPLE INSTALLED
 my_name = config('NAME')  # when to change name
 
+url = 'https://lambda-treasure-hunt.herokuapp.com/api/adv/status/'
+token = config('AUTH_KEY')
+headers = {'Authorization': f'Token {token}'}
+r = requests.post(url, headers=headers)
+ret_data = r.json()
 
 def keystoint(x):
     "function to change json dictionary keys to ints - used for map load"
@@ -19,19 +24,22 @@ def keystoint(x):
 
 
 class Player:
+  
     def __init__(self, name, startingRoom):
         self.name = name
         self.currentRoom = startingRoom
-        self.player_cooldown = 1,
-        self.player_encumbrance = 0,
-        self.player_strength = 0,
-        self.player_speed = 0,
-        self.player_gold = 0,
-        self.player_inventory = [],
-        self.player_status = [],
-        self.player_errors = [],
-        self.player_messages = []
-        self.player_mine = ''
+        self.player_cooldown = ret_data['cooldown']
+        self.player_encumbrance = ret_data['encumbrance']
+        self.player_strength = ret_data['strength']
+        self.player_speed = ret_data['speed']
+        self.player_gold = ret_data['gold']
+        self.player_inventory = ret_data['inventory']
+        self.player_bodywear = ret_data['bodywear']
+        self.player_footwear = ret_data['footwear']
+        self.player_status = ret_data['status']
+        self.player_errors = ret_data['errors']
+        self.player_messages = ret_data['messages']
+        self.player_abilities = ret_data['abilities']
 
 
 class mapper:
@@ -98,6 +106,7 @@ class mapper:
             response = requests.post(
                 f'{my_url}{what}/', headers=self.header, json={"name": treasure})
             print(f"Action: {what}")
+            print(self.info)
 
         if what in ['status', 'pray']:
             response = requests.post(f'{my_url}{what}/', headers=self.header)
@@ -115,6 +124,15 @@ class mapper:
         if what == 'balance':
             response = requests.get(
                 'https://lambda-treasure-hunt.herokuapp.com/api/bc/get_balance/', headers=self.header)
+        if what == 'wear':
+            response = requests.post(
+                'https://lambda-treasure-hunt.herokuapp.com/api/adv/wear/', headers = self.header, json={"name": treasure})
+        if what == 'undress':
+            response = requests.post(
+                'https://lambda-treasure-hunt.herokuapp.com/api/adv/undress/', headers = self.header, json={"name": treasure})
+        if what == 'transmogrify':
+            response = requests.post(
+                'https://lambda-treasure-hunt.herokuapp.com/api/adv/transmogrify/', headers = self.header, json={"name": treasure})
 
         if response.status_code == 200:
             self.info = json.loads(response.content)
@@ -362,6 +380,21 @@ class mapper:
         self.go_to_room(1)
         time.sleep(self.wait)
 
+    def gather_treasure(self):
+      # print(type(self.player.player_encumbrance), type(self.player.player_strength))
+      if self.player.player_encumbrance <= self.player.player_strength - 2:
+        
+        print('Looting..')
+        # * accumlate is true here since that's the whole point of this block
+        self.accumulate = True
+
+                # self.explore_random(500)
+        self.dash_to_room(random.randint(0, 499))
+        print('Current Inventory: ', ret_data['inventory'])
+        time.sleep(self.wait)
+      else:
+        print("Getting close to enumbered! Go sell or transmogrify!")
+
     # Method to get treasure
     # BFS Randomly to travel the maze, looting
     # Once you get enough treasure, go sell
@@ -382,7 +415,7 @@ class mapper:
             print(f"***********Current Character Attributes***************")
             print(ret_data)
             print("*******************************************************")
-
+            
             #!------------------------This name is specific to each person, be sure to change this to yours.
             if ret_data['name'] == 'player420' and ret_data['gold'] >= 1000:
                 # Go to name changer (pirate ry)
@@ -528,6 +561,68 @@ class mapper:
             self.dash_to_room(mine_room)
             self.get_proof()
 
-    
+    def transmogrify(self, chosen_item):
+      # url = 'https://lambda-treasure-hunt.herokuapp.com/api/adv/status/'
+      # token = config('AUTH_KEY')
+      # headers = {'Authorization': f'Token {token}'}
+      # r = requests.post(url, headers=headers)
+      # ret_data = r.json()
+      # print(ret_data)
+      self.dash_to_room(495)
+      # print(self.info)
+      is_there = False
+      for item in self.player.player_inventory:
+        if item == chosen_item:
+          is_there = True
+          res = requests.post(f"https://lambda-treasure-hunt.herokuapp.com/api/adv/transmogrify/", headers = self.header, json={"name": item} )
+          # print(res)
+          print(res.content, 'content')
+          time.sleep(self.wait)
+          break
+      if is_there is False:
+        print('That item does not exist in your inventory')
+          # print(res.content['messages'])
+        
+        # print(res.data, 'data')
+        # print(res.messages, 'mesages')
+        
 
+
+    def equip_gear(self, item_name):
+      # url = 'https://lambda-treasure-hunt.herokuapp.com/api/adv/status/'
+      # token = config('AUTH_KEY')
+      # headers = {'Authorization': f'Token {token}'}
+      # r = requests.post(url, headers=headers)
+      # ret_data = r.json()
+      r = self.action('status')
+      ret_data = r
+      print(ret_data)
+      examine_info = self.action('examine', ret_data['bodywear'])
+      print(f'Examine: {examine_info}')
+      for item in ret_data['inventory']:
+        if item == item_name:
+          # res = requests.post(f"https://lambda-treasure-hunt.herokuapp.com/api/adv/wear/", headers = self.header, json={"name": item})
+          self.action('wear', item)
+          if res.status_code == 200:
+            print(f"Equpided {item}!")
+          else:
+            print(f"Item {item_name} could not be found!")
+        
+    
+    def unequip_gear(self, body_or_feet):
+      if body_or_feet == 'feet':
+        item = self.player.player_footwear
+        res = self.action('undress', item)
+        print(f'You unequipped {item}')
+      elif body_or_feet == 'body':
+        item = self.player.player_bodywear
+        res = self.action('undress', item)
+        print(f'You unequipped {item}')
+    
+    
+"""
+curl -X POST -H 'Authorization: Token 7a375b52bdc410eebbc878ed3e58b2e94a8cb607'
+ -H "Content-Type: application/json" -d '{"name":"[NAME OF ITEM]"}' 
+ https://lambda-treasure-hunt.herokuapp.com/api/adv/transmogrify/
+"""
 
